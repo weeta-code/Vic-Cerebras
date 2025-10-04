@@ -1,0 +1,80 @@
+"""
+Test script for embeddings system functionality
+"""
+
+import asyncio
+import sys
+import os
+
+# Add server directory to path
+sys.path.append('server')
+
+from embeddings import EmbeddingsManager
+from bug_db import BugDatabase
+
+async def test_embeddings():
+    """Test the embeddings system"""
+    print("🔍 Testing Grepal Embeddings System...")
+    
+    # Initialize components
+    embeddings = EmbeddingsManager()
+    bug_db = BugDatabase()
+    
+    # Check if embeddings model is ready
+    print(f"📊 Embeddings model ready: {embeddings.is_ready()}")
+    
+    if not embeddings.is_ready():
+        print("❌ Embeddings model not available - install sentence-transformers")
+        return
+    
+    # Load bug database
+    await bug_db.load_database()
+    print(f"🐛 Loaded {len(bug_db.bugs)} bugs from database")
+    
+    # Test code with off-by-one error
+    test_code = """
+    for (let i = 0; i <= array.length; i++) {
+        console.log(array[i]);
+    }
+    """
+    
+    print(f"\n🧪 Testing similarity search for code:")
+    print(test_code)
+    
+    # Generate embedding for test code
+    embedding = await embeddings.get_code_embedding(test_code, "javascript")
+    print(f"✅ Generated embedding: {embedding is not None}")
+    
+    # Find similar bugs
+    similar_bugs = await embeddings.find_similar_bugs(
+        test_code, 
+        "javascript", 
+        bug_db.bugs,
+        limit=3,
+        threshold=0.2
+    )
+    
+    print(f"\n🔍 Found {len(similar_bugs)} similar bugs:")
+    for i, bug in enumerate(similar_bugs, 1):
+        print(f"  {i}. {bug.get('description', 'No description')}")
+        print(f"     Type: {bug.get('bug_type', 'unknown')}")
+        print(f"     Severity: {bug.get('severity', 'unknown')}")
+        print()
+    
+    # Test caching
+    cache_stats = embeddings.get_cache_stats()
+    print(f"📈 Cache stats: {cache_stats}")
+    
+    # Test adding a new bug embedding
+    new_bug_code = """
+    def divide(a, b):
+        return a / b
+    """
+    
+    await embeddings.add_bug_embedding("test-bug", new_bug_code, "python")
+    print("✅ Added test bug embedding")
+    
+    print("\n🎉 Embeddings system test completed!")
+
+if __name__ == "__main__":
+    asyncio.run(test_embeddings())

@@ -1,0 +1,29 @@
+# Cerebras LLM integration
+cerebras-cloud-sdk>=1.0.0
+
+# HuggingFace for embeddings and model utilities
+transformers>=4.30.0
+sentence-transformers>=2.2.0
+torch>=2.0.0
+
+# Web server and API
+fastapi>=0.104.0
+uvicorn>=0.24.0
+websockets>=11.0.0
+
+# Data processing and storage
+numpy>=1.24.0
+pandas>=2.0.0
+chromadb>=0.4.0
+faiss-cpu>=1.7.4
+
+# Utilities
+python-dotenv>=1.0.0
+pydantic>=2.4.0
+httpx>=0.25.0
+aiofiles>=23.0.0
+
+# Development
+pytest>=7.4.0
+black>=23.0.0
+flake8>=6.0.0
