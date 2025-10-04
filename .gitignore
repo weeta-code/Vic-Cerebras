@@ -1,0 +1,74 @@
+# Output directories
+out/
+dist/
+
+# Node modules
+node_modules/
+
+# Python virtual environment
+server/grepal_env/
+server/__pycache__/
+server/*.pyc
+server/.env
+
+# IDE/Editor files
+.vscode-test/
+*.vsix
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+.coverage
+
+# nyc test coverage
+.nyc_output
+
+# Dependency directories
+jspm_packages/
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Temporary folders
+tmp/
+temp/
+
+# dotenv environment variables file
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+
+# Cerebras API keys and secrets
+.cerebras_key
+api_keys.txt
+
+# Vector database storage
+vector_db/
+embeddings_cache/
+
+# Bug database
+bugs.json
+bug_embeddings.pkl
