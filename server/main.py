@@ -93,6 +93,154 @@ def record_request(client_ip: str):
     rate_limiter[client_ip].append(time.time())
 
 
+def extract_bug_snippet(code: str, line_number: int, context_lines: int = 3) -> str:
+    """
+    Extract a code snippet around the bug line for more focused embedding
+    
+    Args:
+        code: Full code content
+        line_number: Line where bug was detected (1-indexed)
+        context_lines: Number of lines before/after to include
+    
+    Returns:
+        Code snippet focused on the bug area
+    """
+    lines = code.split('\n')
+    total_lines = len(lines)
+    
+    # Convert to 0-indexed
+    bug_line_idx = max(0, line_number - 1)
+    
+    # Calculate snippet bounds
+    start_idx = max(0, bug_line_idx - context_lines)
+    end_idx = min(total_lines, bug_line_idx + context_lines + 1)
+    
+    # Extract snippet
+    snippet_lines = lines[start_idx:end_idx]
+    snippet = '\n'.join(snippet_lines)
+    
+    print(f"SNIPPET EXTRACTION:")
+    print(f"   Bug line: {line_number} (in {total_lines} total lines)")
+    print(f"   Extracted lines {start_idx + 1}-{end_idx} ({len(snippet_lines)} lines)")
+    print(f"   Snippet: {repr(snippet[:100])}...")
+    
+    return snippet
+
+
+async def _auto_learn_from_issues(
+    issues: List[Dict[str, Any]], 
+    full_code: str, 
+    language: str,
+    bug_database,
+    embeddings_manager
+) -> None:
+    """
+    Automatically learn from discovered bugs by extracting snippets and adding to database
+    """
+    try:
+        for issue in issues:
+            bug_line = issue.get('line', 1)
+            bug_type = issue.get('type', 'unknown')
+            bug_message = issue.get('message', 'Code issue detected')
+            bug_fix = issue.get('suggestion', 'Consider reviewing this code')
+            
+            # Extract focused snippet around the bug
+            bug_snippet = extract_bug_snippet(full_code, bug_line, context_lines=2)
+            
+            # Skip if snippet is too small (likely not meaningful)
+            if len(bug_snippet.strip()) < 10:
+                print(f"AUTO-LEARNING: Skipping tiny snippet for {bug_type}")
+                continue
+            
+            # Create a more specific bug type based on content
+            enhanced_bug_type = f"{bug_type}_{language}"
+            
+            # Check for potential duplicates in recent bugs (basic deduplication)
+            is_duplicate = await _check_for_duplicate_bug(
+                bug_snippet, language, bug_type, bug_database
+            )
+            
+            if is_duplicate:
+                print(f"AUTO-LEARNING: Skipping duplicate bug: {bug_type}")
+                continue
+            
+            print(f"AUTO-LEARNING: Adding {enhanced_bug_type} to database...")
+            
+            # Add to bug database (this triggers embedding generation)
+            try:
+                bug_id = await bug_database.add_bug(
+                    code=bug_snippet,  # ← SNIPPET, not full code
+                    language=language,
+                    bug_type=enhanced_bug_type,
+                    fix=bug_fix,
+                    description=f"Auto-learned: {bug_message}",
+                    severity=issue.get('severity', 'medium')
+                )
+                
+                # Add embedding to vector cache (mark as snippet for better processing)
+                await embeddings_manager.add_bug_embedding(
+                    bug_id, bug_snippet, language, is_snippet=True
+                )
+                
+                print(f"AUTO-LEARNING: Successfully added bug {bug_id} to database")
+                
+            except Exception as e:
+                print(f"AUTO-LEARNING: Failed to add bug {enhanced_bug_type}: {e}")
+                continue
+                
+    except Exception as e:
+        print(f"AUTO-LEARNING: Failed to process issues: {e}")
+
+
+async def _check_for_duplicate_bug(
+    snippet: str, 
+    language: str, 
+    bug_type: str, 
+    bug_database,
+    similarity_threshold: float = 0.85
+) -> bool:
+    """
+    Check if this bug snippet is too similar to existing bugs (basic duplicate detection)
+    
+    Returns True if this appears to be a duplicate
+    """
+    try:
+        # Get recent bugs of the same type and language
+        recent_bugs = [
+            bug for bug in bug_database.bugs[-20:]  # Check last 20 bugs only
+            if (bug.get('language') == language and 
+                bug.get('bug_type', '').startswith(bug_type))
+        ]
+        
+        if not recent_bugs:
+            return False
+        
+        # Simple text-based similarity check (not using embeddings to avoid recursion)
+        snippet_words = set(snippet.lower().split())
+        
+        for existing_bug in recent_bugs:
+            existing_code = existing_bug.get('code', '')
+            existing_words = set(existing_code.lower().split())
+            
+            # Calculate Jaccard similarity
+            if len(snippet_words) == 0 or len(existing_words) == 0:
+                continue
+                
+            intersection = len(snippet_words & existing_words)
+            union = len(snippet_words | existing_words)
+            jaccard_similarity = intersection / union if union > 0 else 0
+            
+            if jaccard_similarity > similarity_threshold:
+                print(f"AUTO-LEARNING: Found duplicate (Jaccard: {jaccard_similarity:.3f})")
+                return True
+        
+        return False
+        
+    except Exception as e:
+        print(f"AUTO-LEARNING: Duplicate check failed: {e}")
+        return False  # If check fails, allow the bug to be added
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize and cleanup resources"""
@@ -288,6 +436,17 @@ async def analyze_code(request: CodeAnalysisRequest):
                     snarkLevel=snark_level_num
                 )
                 formatted_issues.append(formatted_issue)
+            
+            # AUTOMATIC LEARNING: Add discovered bugs to database
+            if analysis_result.issues and bug_database and embeddings_manager:
+                print(f"AUTO-LEARNING: Processing {len(analysis_result.issues)} bugs for automatic learning...")
+                await _auto_learn_from_issues(
+                    analysis_result.issues,
+                    request.code,
+                    request.language,
+                    bug_database,
+                    embeddings_manager
+                )
             
             response = CodeAnalysisResponse(
                 issues=formatted_issues,

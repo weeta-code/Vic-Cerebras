@@ -70,26 +70,33 @@ class EmbeddingsManager:
         except Exception as e:
             print(f"WARNING: Failed to save embeddings cache: {e}")
     
-    async def get_code_embedding(self, code: str, language: str) -> Optional[np.ndarray]:
+    async def get_code_embedding(self, code: str, language: str, is_snippet: bool = False) -> Optional[np.ndarray]:
         """
         Get embedding for a piece of code
+        
+        Args:
+            code: Code to embed
+            language: Programming language
+            is_snippet: If True, this is a focused bug snippet (affects caching strategy)
         """
         if not self.is_ready():
             print(f"Embeddings model not ready - cannot generate embedding")
             return None
         
         # Create a more specific cache key using processed code hash
-        processed_preview = self._preprocess_code(code, language)
-        cache_key = f"{language}:{hash(processed_preview)}{len(code)}"
+        processed_preview = self._preprocess_code(code, language, is_snippet)
+        
+        # Enhanced cache key with snippet indicator
+        cache_key = f"{language}:{hash(processed_preview)}:{len(code)}:{'snippet' if is_snippet else 'full'}"
         
         if cache_key in self.embeddings_cache:
-            print(f"Using cached embedding for {language} code")
+            print(f"Using cached embedding for {language} {'snippet' if is_snippet else 'code'}")
             return self.embeddings_cache[cache_key]
         
         try:
             # Preprocess code for better embeddings
-            processed_code = self._preprocess_code(code, language)
-            print(f"Processing {language} code for embedding:")
+            processed_code = self._preprocess_code(code, language, is_snippet)
+            print(f"Processing {language} {'snippet' if is_snippet else 'code'} for embedding:")
             print(f"   Original length: {len(code)} chars")
             print(f"   Processed length: {len(processed_code)} chars")
             print(f"   Processed code preview: {processed_code[:200]}...")
@@ -116,10 +123,15 @@ class EmbeddingsManager:
             print(f"ERROR: Failed to generate embedding: {e}")
             return None
     
-    def _preprocess_code(self, code: str, language: str) -> str:
+    def _preprocess_code(self, code: str, language: str, is_snippet: bool = False) -> str:
         """
         Preprocess code to improve embedding quality
         Focus on structure and logic, less on syntax
+        
+        Args:
+            code: Code to preprocess
+            language: Programming language
+            is_snippet: If True, preserve more structure for focused analysis
         """
         # Remove comments and clean up
         lines = code.split('\n')
@@ -132,20 +144,29 @@ class EmbeddingsManager:
             if not line:
                 continue
             
-            # Skip comments (basic detection)
-            if language in ['python'] and line.startswith('#'):
-                continue
-            if language in ['javascript', 'typescript', 'java', 'cpp'] and line.startswith('//'):
-                continue
-                
+            # For snippets, be less aggressive about comment removal
+            if not is_snippet:
+                # Skip comments (basic detection)
+                if language in ['python'] and line.startswith('#'):
+                    continue
+                if language in ['javascript', 'typescript', 'java', 'cpp'] and line.startswith('//'):
+                    continue
+            
             # Add language context
             cleaned_lines.append(line)
         
-        # Add language prefix for better context
-        processed = f"[{language}] " + " ".join(cleaned_lines)
+        # For snippets, preserve line structure; for full code, flatten
+        if is_snippet:
+            # Preserve line breaks for better bug context
+            processed_code = "\n".join(cleaned_lines)
+            processed = f"[{language}_bug] {processed_code}"
+        else:
+            # Flatten for general similarity
+            processed = f"[{language}] " + " ".join(cleaned_lines)
         
-        # Limit length to avoid token limits
-        return processed[:1000]
+        # Different limits for snippets vs full code
+        max_length = 500 if is_snippet else 1000
+        return processed[:max_length]
     
     async def find_similar_bugs(
         self, 
@@ -236,14 +257,21 @@ class EmbeddingsManager:
             traceback.print_exc()
             return []
     
-    async def add_bug_embedding(self, bug_id: str, code: str, language: str):
+    async def add_bug_embedding(self, bug_id: str, code: str, language: str, is_snippet: bool = True):
         """
         Add a new bug embedding to the cache
+        
+        Args:
+            bug_id: Unique identifier for the bug
+            code: Bug code (usually a snippet)
+            language: Programming language
+            is_snippet: Whether this is a focused bug snippet (default True)
         """
         print(f"ADDING BUG EMBEDDING:")
         print(f"   Bug ID: {bug_id}")
         print(f"   Language: {language}")
         print(f"   Code length: {len(code)} chars")
+        print(f"   Code type: {'snippet' if is_snippet else 'full code'}")
         print(f"   Code preview: {repr(code[:100])}...")
         
         if not self.is_ready():
@@ -251,13 +279,15 @@ class EmbeddingsManager:
             return
         
         try:
-            embedding = await self.get_code_embedding(code, language)
+            # Use snippet-aware embedding generation
+            embedding = await self.get_code_embedding(code, language, is_snippet)
             if embedding is not None:
                 print(f"Successfully added embedding for bug {bug_id}")
                 print(f"   Embedding shape: {embedding.shape}")
                 print(f"   Cache size after addition: {len(self.embeddings_cache)}")
                 
-                if len(self.embeddings_cache) % 10 == 0:
+                # Save cache more frequently for auto-learned bugs
+                if len(self.embeddings_cache) % 5 == 0:
                     self._save_embeddings_cache()
                     print(f"Saved embeddings cache to disk")
             else:

@@ -44,7 +44,7 @@
       },
       {
         "command": "grepal.showInsights",
-        "title": "Show Debug Insights",
+        "title": "Show Analysis History",
         "category": "Grepal"
       }
     ],

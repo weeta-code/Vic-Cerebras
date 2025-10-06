@@ -7,7 +7,6 @@ import asyncio
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 
-# Load environment variables from .env file
 try:
     from dotenv import load_dotenv
     load_dotenv()
@@ -35,7 +34,7 @@ class CerebrasAnalyzer:
     def __init__(self):
         self.api_key = os.getenv('CEREBRAS_API_KEY')
         self.client = None
-        self.model = "llama3.1-8b"  # Fast model for real-time analysis
+        self.model = "llama3.1-8b" 
         
         if not self.api_key:
             print("WARNING: CEREBRAS_API_KEY not found in environment variables")
@@ -79,7 +78,7 @@ class CerebrasAnalyzer:
         
         # Craft the prompt based on snark level
         snark_prompts = {
-            "mild": "You are a code reviewer who only points out actual bugs that will cause the code to break or behave incorrectly. Be mildly sarcastic about genuine errors.",
+            "mild": "You are a code reviewer who only points out actual bugs that will cause the code to break or behave incorrectly. Be  sarcastic about genuine errors.",
             "medium": "You are a sarcastic code reviewer who ONLY roasts actual bugs - syntax errors, logic errors, or runtime errors that will cause crashes or incorrect behavior. Ignore style preferences. Be brutally sarcastic about genuine mistakes.",
             "savage": "You are a merciless code reviewer who ONLY destroys code with actual bugs - syntax errors, logic errors, runtime errors, or security vulnerabilities. Do NOT comment on style choices, naming conventions, or framework preferences. Only roast code that is genuinely broken or will cause problems."
         }
