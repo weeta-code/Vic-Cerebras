@@ -72,19 +72,6 @@ Grepal/
 3. **Adjust snark level**: Go to VSCode Settings → Extensions → Grepal → Snark Level
 4. **View insights**: Command Palette → "Grepal: Show Debug Insights"
 
-## Features in Development
-
-- [x] Real-time code analysis
-- [x] Cerebras LLM integration
-- [x] HuggingFace embeddings
-- [ ] Bug database with vector search
-- [ ] Multi-language syntax error detection
-- [ ] Runtime error prediction
-- [ ] Snarky response generation
-- [ ] VSCode UI integration
-- [ ] Performance optimization
-
-## Development
 
 ### Running the Extension
 ```bash
@@ -106,14 +93,6 @@ npm run lint
 cd server && pytest
 ```
 
-## Project Status
-
-This is a **Cerebras DevX Growth Team take-home project** showcasing:
-- **Viral Potential**: Snarky AI personality with real utility
-- **Cerebras Integration**: Ultra-fast LLM inference for real-time analysis  
-- **Additional Product**: HuggingFace embeddings for smart bug lookup
-- **VSCode Platform**: Leveraging the most popular code editor
-
 ## The Grepal Experience
 
 ```typescript
@@ -129,15 +108,10 @@ You're trying to access users[0] when the array is empty.
 Also, that <= should be <, unless you enjoy undefined errors.
 Here's the fix, genius: i < users.length"
 ```
-
-## Contributing
-
-This project is part of a Cerebras evaluation, but feedback and suggestions are welcome!
-
 ## License
 
 MIT License - Feel free to fork and improve (your code probably needs it anyway)
 
 ---
 
-*Built with love (and a healthy dose of snark) for the Cerebras DevX Growth Team*
+*Built with love (and a healthy dose of snark) 
